@@ -12,7 +12,16 @@
   - **The Chronicle** — a structured event log of everything meaningful that has happened across all expeditions. Each event has typed consequences         that mutate world state.
   - **The Consequence Engine** — a deterministic function from chronicle history to current world state for any zone. Buildings, NPC dispositions,           town flags, all derived from events.
   - **The Narrative Director** *(week 5)* — a hierarchical planner that selects which past events to surface in the current expedition based on             dramatic arc and player choices, then conditions LLM-driven NPC dialogue on the relevant chronicle context.
+
+  ## Tech stack
   
+  - **Frontend / game** — Phaser 3, TypeScript, Vite
+  - **Backend** — FastAPI, Python 3.12
+  - **Database** — PostgreSQL (week 4+); JSON files prior
+  - **LLM** — Anthropic Claude (Haiku for development, Sonnet for production NPC dialogue)
+  - **Hosting** — Vercel (frontend), Render (backend + Postgres)
+  - **CI** — GitHub Actions
+    
   ## Demo
   Live demo and 90-second video coming week 8.
   
