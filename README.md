@@ -24,4 +24,4 @@
   See [devlog/](./devlog/) for weekly progress.
 
   ## License
-  
+  Distributed under the MIT License. See `LICENSE` for more information.
