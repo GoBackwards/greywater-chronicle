@@ -1,3 +1,4 @@
+[![CI](https://github.com/GoBackwards/greywater-chronicle/actions/workflows/ci.yml/badge.svg)](https://github.com/GoBackwards/greywater-chronicle/actions/workflows/ci.yml)
 # greywwater-chronicle
   
   An AI-driven persistent world where the consequences of one player's actions reshape the world for everyone who follows.
