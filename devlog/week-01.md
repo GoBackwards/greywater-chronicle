@@ -23,3 +23,7 @@
 **---**
 
 **## Day 2**
+
+**setup uv**
+
+deployed FastAPI service with one endpoint, with tests, with CI passing
