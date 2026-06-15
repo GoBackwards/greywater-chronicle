@@ -27,3 +27,19 @@
 **setup uv**
 
 deployed FastAPI service with one endpoint, with tests, with CI passing
+
+**## Day 3**
+
+setup frontend (Vite + Phaser) scaffolds
+
+## Day 4
+
+downloaded Kenney Tiny Town tileset, set up public/ asset pipeline, hand-coded first 20×15 town with a manual mapData[][] array
+
+## Day 5
+
+installed Tiled editor, bumped map to 50×25, fixed "External tilesets unsupported" by embedding the tileset and re-exporting
+
+## Day 6
+
+added second tileset (Tiny Dungeon) with multi-tileset createLayer, wired camera scrolling (setBounds + startFollow + setScrollFactor for HUD), replaced placeholder rectangle with character sprite from the tileset
