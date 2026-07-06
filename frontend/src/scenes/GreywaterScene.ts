@@ -8,7 +8,11 @@ import Phaser from 'phaser';
 const MAP_W = 50;
 const MAP_H = 25;
 const TILE_SCALE = 2;       
-
+const NPCs = [
+  { name: 'Guard',  tile: 97,  x: 25,  y: 20 },
+  { name: 'Miller', tile: 100, x: 33, y: 9  },
+  { name: 'Reeve',  tile: 84,  x: 25, y: 10 },
+];
 
 export class GreywaterScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -66,6 +70,17 @@ export class GreywaterScene extends Phaser.Scene {
     const worldH = map.heightInPixels * TILE_SCALE;
     this.cameras.main.setBounds(0, 0, worldW, worldH);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+
+    NPCs.forEach(npc => {
+      const worldX = npc.x * 16 * TILE_SCALE;
+      const worldY = npc.y * 16 * TILE_SCALE;
+      this.add.sprite(worldX, worldY, 'tiny-dungeon', npc.tile)
+        .setScale(TILE_SCALE)
+        .setDepth(10);
+      this.add.text(worldX, worldY - 20, npc.name, {
+        color: '#fff', fontSize: '12px', backgroundColor: '#0006', padding: { x: 2 }
+      }).setOrigin(0.5, 1).setDepth(11);
+    });
   }
 
   update() {
