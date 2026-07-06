@@ -43,3 +43,6 @@ installed Tiled editor, bumped map to 50×25, fixed "External tilesets unsupport
 ## Day 6
 
 added second tileset (Tiny Dungeon) with multi-tileset createLayer, wired camera scrolling (setBounds + startFollow + setScrollFactor for HUD), replaced placeholder rectangle with character sprite from the tileset
+
+## Day 7
+added three NPCs (guard, miller, reeve) as static dungeon-sprite characters with name labels at fixed town positions
