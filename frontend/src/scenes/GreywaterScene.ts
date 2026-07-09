@@ -9,10 +9,30 @@ const MAP_W = 50;
 const MAP_H = 25;
 const TILE_SCALE = 2;       
 const NPCs = [
-  { name: 'Guard',  tile: 97,  x: 25,  y: 20 },
-  { name: 'Miller', tile: 100, x: 33, y: 9  },
-  { name: 'Reeve',  tile: 84,  x: 25, y: 10 },
+  {
+    name: 'Guard',
+    tile: 97,
+    x: 25,
+    y: 20,
+    dialogue: "Welcome to Greywater. State your business, traveler.",
+  },
+  {
+    name: 'Miller',
+    tile: 100,
+    x: 33,
+    y: 9,
+    dialogue: "Mill wheel snapped last Sabbath. No flour till it's mended, and the wright's overbooked. Sorry, friend.",
+  },
+  {
+    name: 'Reeve',
+    tile: 84,
+    x: 25,
+    y: 10,
+    dialogue: "Half the village at my door with complaints, and the crown's tax rolls due by month's end. If you've a grievance, form a queue.",
+  },
 ];
+type NPC = typeof NPCs[number];
+const INTERACT_RANGE = 60;
 
 export class GreywaterScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -23,6 +43,9 @@ export class GreywaterScene extends Phaser.Scene {
     S: Phaser.Input.Keyboard.Key;
     D: Phaser.Input.Keyboard.Key;
   };
+  private eKey!: Phaser.Input.Keyboard.Key;
+  private npcSprites: { sprite: Phaser.GameObjects.Sprite; data: NPC }[] = [];
+  private dialogueUI: Phaser.GameObjects.GameObject[] | null = null;
 
   constructor() {
     super('greywater');
@@ -65,6 +88,7 @@ export class GreywaterScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as typeof this.wasd;
+    this.eKey = this.input.keyboard!.addKey('E');
 
     const worldW = map.widthInPixels * TILE_SCALE;
     const worldH = map.heightInPixels * TILE_SCALE;
@@ -74,20 +98,85 @@ export class GreywaterScene extends Phaser.Scene {
     NPCs.forEach(npc => {
       const worldX = npc.x * 16 * TILE_SCALE;
       const worldY = npc.y * 16 * TILE_SCALE;
-      this.add.sprite(worldX, worldY, 'tiny-dungeon', npc.tile)
+      const sprite = this.add.sprite(worldX, worldY, 'tiny-dungeon', npc.tile)
         .setScale(TILE_SCALE)
-        .setDepth(10);
+        .setDepth(10)
+        .setInteractive({ useHandCursor: true });
       this.add.text(worldX, worldY - 20, npc.name, {
         color: '#fff', fontSize: '12px', backgroundColor: '#0006', padding: { x: 2 }
       }).setOrigin(0.5, 1).setDepth(11);
+      sprite.on('pointerdown', () => this.openDialogue(npc));
+      this.npcSprites.push({ sprite, data: npc });
     });
   }
 
   update() {
+    // E toggles dialogue (JustDown fires once per press, not every frame)
+    if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+      if (this.dialogueUI) {
+        this.closeDialogue();
+      } else {
+        const nearest = this.findNearestNPC();
+        if (nearest) this.openDialogue(nearest);
+      }
+    }
+
+    // Movement is gated: no walking while reading
+    if (this.dialogueUI) return;
+
     const speed = 3;
     if (this.wasd.A.isDown) this.player.x -= speed;
     if (this.wasd.D.isDown) this.player.x += speed;
     if (this.wasd.W.isDown) this.player.y -= speed;
     if (this.wasd.S.isDown) this.player.y += speed;
+  }
+
+  private findNearestNPC(): NPC | null {
+    let bestData: NPC | null = null;
+    let bestDist = Infinity;
+    for (const { sprite, data } of this.npcSprites) {
+      const dist = Phaser.Math.Distance.Between(sprite.x, sprite.y, this.player.x, this.player.y);
+      if (dist <= INTERACT_RANGE && dist < bestDist) {
+        bestDist = dist;
+        bestData = data;
+      }
+    }
+    return bestData;
+  }
+
+  private openDialogue(npc: NPC) {
+    if (this.dialogueUI) this.closeDialogue();
+
+    const cam = this.cameras.main;
+    const panelH = 100;
+    const panelY = cam.height - panelH;
+
+    const panel = this.add.rectangle(0, panelY, cam.width, panelH, 0x000000, 0.75)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(100)
+      .setInteractive();
+
+    const nameText = this.add.text(20, panelY + 12, npc.name, {
+      color: '#ffcf5a', fontSize: '18px', fontStyle: 'bold',
+    }).setScrollFactor(0).setDepth(101);
+
+    const bodyText = this.add.text(20, panelY + 40, npc.dialogue, {
+      color: '#ffffff', fontSize: '14px',
+      wordWrap: { width: cam.width - 40 },
+    }).setScrollFactor(0).setDepth(101);
+
+    const hint = this.add.text(cam.width - 12, panelY + panelH - 8, '[E] or click to close', {
+      color: '#aaaaaa', fontSize: '10px',
+    }).setOrigin(1, 1).setScrollFactor(0).setDepth(101);
+
+    panel.on('pointerdown', () => this.closeDialogue());
+
+    this.dialogueUI = [panel, nameText, bodyText, hint];
+  }
+
+  private closeDialogue() {
+    this.dialogueUI?.forEach(obj => obj.destroy());
+    this.dialogueUI = null;
   }
 }

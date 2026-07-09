@@ -46,3 +46,7 @@ added second tileset (Tiny Dungeon) with multi-tileset createLayer, wired camera
 
 ## Day 7
 added three NPCs (guard, miller, reeve) as static dungeon-sprite characters with name labels at fixed town positions
+
+## Day 8
+
+added NPC interaction (E-key toggle or click), proximity check with Phaser.Math.Distance, bottom dialogue panel with hardcoded per-NPC lines
