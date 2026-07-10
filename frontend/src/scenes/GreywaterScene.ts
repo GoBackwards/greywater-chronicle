@@ -5,31 +5,14 @@ import Phaser from 'phaser';
 //
 // Names marked with `// ?` are visual-guess and may need renaming after you
 // open the sheet in an image viewer. Indices themselves are correct.
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:8000';
 const MAP_W = 50;
 const MAP_H = 25;
 const TILE_SCALE = 2;       
 const NPCs = [
-  {
-    name: 'Guard',
-    tile: 97,
-    x: 25,
-    y: 20,
-    dialogue: "Welcome to Greywater. State your business, traveler.",
-  },
-  {
-    name: 'Miller',
-    tile: 100,
-    x: 33,
-    y: 9,
-    dialogue: "Mill wheel snapped last Sabbath. No flour till it's mended, and the wright's overbooked. Sorry, friend.",
-  },
-  {
-    name: 'Reeve',
-    tile: 84,
-    x: 25,
-    y: 10,
-    dialogue: "Half the village at my door with complaints, and the crown's tax rolls due by month's end. If you've a grievance, form a queue.",
-  },
+  { name: 'Guard',  tile: 97,  x: 25, y: 20 },
+  { name: 'Miller', tile: 100, x: 33, y: 9  },
+  { name: 'Reeve',  tile: 84,  x: 25, y: 10 },
 ];
 type NPC = typeof NPCs[number];
 const INTERACT_RANGE = 60;
@@ -45,7 +28,12 @@ export class GreywaterScene extends Phaser.Scene {
   };
   private eKey!: Phaser.Input.Keyboard.Key;
   private npcSprites: { sprite: Phaser.GameObjects.Sprite; data: NPC }[] = [];
-  private dialogueUI: Phaser.GameObjects.GameObject[] | null = null;
+  private dialogueUI: {
+    panel: Phaser.GameObjects.Rectangle;
+    nameText: Phaser.GameObjects.Text;
+    bodyText: Phaser.GameObjects.Text;
+    hint: Phaser.GameObjects.Text;
+  } | null = null;
 
   constructor() {
     super('greywater');
@@ -143,40 +131,53 @@ export class GreywaterScene extends Phaser.Scene {
     }
     return bestData;
   }
-
-  private openDialogue(npc: NPC) {
+  private async openDialogue(npc: NPC) {
     if (this.dialogueUI) this.closeDialogue();
-
+  
     const cam = this.cameras.main;
     const panelH = 100;
     const panelY = cam.height - panelH;
-
+  
     const panel = this.add.rectangle(0, panelY, cam.width, panelH, 0x000000, 0.75)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(100)
       .setInteractive();
-
+  
     const nameText = this.add.text(20, panelY + 12, npc.name, {
       color: '#ffcf5a', fontSize: '18px', fontStyle: 'bold',
     }).setScrollFactor(0).setDepth(101);
-
-    const bodyText = this.add.text(20, panelY + 40, npc.dialogue, {
+  
+    const bodyText = this.add.text(20, panelY + 40, '...', {
       color: '#ffffff', fontSize: '14px',
       wordWrap: { width: cam.width - 40 },
     }).setScrollFactor(0).setDepth(101);
-
+  
     const hint = this.add.text(cam.width - 12, panelY + panelH - 8, '[E] or click to close', {
       color: '#aaaaaa', fontSize: '10px',
     }).setOrigin(1, 1).setScrollFactor(0).setDepth(101);
-
+  
     panel.on('pointerdown', () => this.closeDialogue());
-
-    this.dialogueUI = [panel, nameText, bodyText, hint];
+    this.dialogueUI = { panel, nameText, bodyText, hint };
+  
+    const currentUI = this.dialogueUI;
+    const npcId = npc.name.toLowerCase();
+  
+    try {
+      const res = await fetch(`${BACKEND_URL}/npcs/${npcId}/dialogue`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (this.dialogueUI === currentUI) currentUI.bodyText.setText(data.dialogue);
+    } catch (err) {
+      if (this.dialogueUI === currentUI) {
+        currentUI.bodyText.setText(`[couldn't reach server: ${err}]`);
+      }
+    }
   }
 
   private closeDialogue() {
-    this.dialogueUI?.forEach(obj => obj.destroy());
+    if (!this.dialogueUI) return;
+    Object.values(this.dialogueUI).forEach(o => o.destroy());
     this.dialogueUI = null;
   }
 }
