@@ -6,9 +6,7 @@ import Phaser from 'phaser';
 // Names marked with `// ?` are visual-guess and may need renaming after you
 // open the sheet in an image viewer. Indices themselves are correct.
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:8000';
-const MAP_W = 50;
-const MAP_H = 25;
-const TILE_SCALE = 2;       
+const TILE_SCALE = 2;
 const NPCs = [
   { name: 'Guard',  tile: 97,  x: 25, y: 20 },
   { name: 'Miller', tile: 100, x: 33, y: 9  },
@@ -19,7 +17,6 @@ const INTERACT_RANGE = 60;
 
 export class GreywaterScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -60,7 +57,7 @@ export class GreywaterScene extends Phaser.Scene {
     if (!townTileset || !dungeonTileset) throw new Error('Tileset not found in tilemap');
     const tilesets = [townTileset, dungeonTileset];
 
-    const layers = map.layers.map(l =>
+    map.layers.forEach(l =>
       map.createLayer(l.name, tilesets, 0, 0)?.setScale(TILE_SCALE)
     );
 
@@ -74,7 +71,6 @@ export class GreywaterScene extends Phaser.Scene {
       .setScale(TILE_SCALE)
       .setDepth(10);
 
-    this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as typeof this.wasd;
     this.eKey = this.input.keyboard!.addKey('E');
 
