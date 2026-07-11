@@ -50,3 +50,7 @@ added three NPCs (guard, miller, reeve) as static dungeon-sprite characters with
 ## Day 8
 
 added NPC interaction (E-key toggle or click), proximity check with Phaser.Math.Distance, bottom dialogue panel with hardcoded per-NPC lines
+
+## Day 9
+
+added FastAPI /npcs/{id}/dialogue endpoint with pytest coverage, wired CORS, replaced hardcoded frontend strings with fetch (loading + error states), deployed backend to Render and frontend to Vercel

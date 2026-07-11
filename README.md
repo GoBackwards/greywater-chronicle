@@ -1,5 +1,5 @@
 [![CI](https://github.com/GoBackwards/greywater-chronicle/actions/workflows/ci.yml/badge.svg)](https://github.com/GoBackwards/greywater-chronicle/actions/workflows/ci.yml)
-# greywwater-chronicle
+# greywater-chronicle
   
   An AI-driven persistent world where the consequences of one player's actions reshape the world for everyone who follows.
   
@@ -24,7 +24,13 @@
   - **CI** — GitHub Actions
     
   ## Demo
-  Live demo and 90-second video coming week 8.
+
+  **Live:** https://greywater-chronicle-2g5m.vercel.app/
+
+  > Desktop only (WASD to move, E or click to talk) — touch controls on the Week 2+ backlog.
+  > First interaction takes ~30s while Render's free tier wakes the backend.
+
+  90-second video coming week 8.
   
   ## Devlog
   See [devlog/](./devlog/) for weekly progress.
