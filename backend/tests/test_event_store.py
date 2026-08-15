@@ -100,3 +100,37 @@ def test_reopen_database_and_replay_restores_world_state(tmp_path: Path):
 
     assert [stored_event.revision for stored_event in stored_events] == [1]
     assert recovered_state.mill_status is MillStatus.WORKING
+
+
+def test_load_events_returns_events_in_revision_order(tmp_path: Path):
+    database_path = tmp_path / "chronicle.db"
+    migration_sql = MIGRATION_PATH.read_text(encoding="utf-8")
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.executescript(migration_sql)
+
+        # Insert out of order deliberately.
+        append_event(
+            connection=connection,
+            revision=2,
+            event=MillRepaired(actor_id="player-b"),
+        )
+        append_event(
+            connection=connection,
+            revision=1,
+            event=MillRepaired(actor_id="player-a"),
+        )
+        connection.commit()
+
+        stored_events = load_events(connection)
+
+    assert stored_events == [
+        StoredEvent(
+            revision=1,
+            event=MillRepaired(actor_id="player-a"),
+        ),
+        StoredEvent(
+            revision=2,
+            event=MillRepaired(actor_id="player-b"),
+        ),
+    ]
