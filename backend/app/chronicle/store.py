@@ -12,6 +12,72 @@ class StoredEvent:
     event: MillRepaired
 
 
+@dataclass(frozen=True)
+class ProcessedCommand:
+    command_id: str
+    command_type: str
+    actor_id: str
+    expected_revision: int
+    result_revision: int
+
+
+def append_processed_command(
+    connection: sqlite3.Connection,
+    command: ProcessedCommand,
+) -> None:
+    """Record the event produced by one successfully processed command."""
+    connection.execute(
+        """
+        INSERT INTO processed_commands (
+            command_id,
+            command_type,
+            actor_id,
+            expected_revision,
+            result_revision
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            command.command_id,
+            command.command_type,
+            command.actor_id,
+            command.expected_revision,
+            command.result_revision,
+        ),
+    )
+
+
+def load_processed_command(
+    connection: sqlite3.Connection,
+    command_id: str,
+) -> ProcessedCommand | None:
+    """Load a previously processed command by its idempotency key."""
+    row = connection.execute(
+        """
+        SELECT
+            command_id,
+            command_type,
+            actor_id,
+            expected_revision,
+            result_revision
+        FROM processed_commands
+        WHERE command_id = ?
+        """,
+        (command_id,),
+    ).fetchone()
+
+    if row is None:
+        return None
+
+    return ProcessedCommand(
+        command_id=row[0],
+        command_type=row[1],
+        actor_id=row[2],
+        expected_revision=row[3],
+        result_revision=row[4],
+    )
+
+
 def append_event(
     connection: sqlite3.Connection,
     revision: int,
@@ -45,6 +111,51 @@ def append_event(
     )
 
 
+def _stored_event_from_row(
+    row: tuple[int, str, int, str],
+) -> StoredEvent:
+    revision, event_type, schema_version, payload_json = row
+
+    payload = json.loads(payload_json)
+
+    event = decode_event(
+        {
+            "event_type": event_type,
+            "schema_version": schema_version,
+            "payload": payload,
+        }
+    )
+
+    return StoredEvent(
+        revision=revision,
+        event=event,
+    )
+
+
+def load_event(
+    connection: sqlite3.Connection,
+    revision: int,
+) -> StoredEvent | None:
+    """Load one Chronicle event by its exact revision."""
+    row = connection.execute(
+        """
+        SELECT
+            revision,
+            event_type,
+            schema_version,
+            payload_json
+        FROM chronicle_events
+        WHERE revision = ?
+        """,
+        (revision,),
+    ).fetchone()
+
+    if row is None:
+        return None
+
+    return _stored_event_from_row(row)
+
+
 def load_events(
     connection: sqlite3.Connection,
 ) -> list[StoredEvent]:
@@ -61,24 +172,4 @@ def load_events(
         """
     ).fetchall()
 
-    stored_events: list[StoredEvent] = []
-
-    for revision, event_type, schema_version, payload_json in rows:
-        payload = json.loads(payload_json)
-
-        encoded_event = {
-            "event_type": event_type,
-            "schema_version": schema_version,
-            "payload": payload,
-        }
-
-        event = decode_event(encoded_event)
-
-        stored_events.append(
-            StoredEvent(
-                revision=revision,
-                event=event,
-            )
-        )
-
-    return stored_events
+    return [_stored_event_from_row(row) for row in rows]
