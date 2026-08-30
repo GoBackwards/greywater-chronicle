@@ -5,8 +5,12 @@ from pathlib import Path
 
 from app.chronicle.models import MillRepaired, MillStatus
 from app.chronicle.reducer import replay
-from app.chronicle.store import StoredEvent, append_event, load_events
-
+from app.chronicle.store import (
+    StoredEvent,
+    append_event,
+    load_event,
+    load_events,
+)
 
 MIGRATION_PATH = (
     Path(__file__).parents[1]
@@ -134,3 +138,48 @@ def test_load_events_returns_events_in_revision_order(tmp_path: Path):
             event=MillRepaired(actor_id="player-b"),
         ),
     ]
+
+
+def test_load_event_returns_requested_revision(tmp_path: Path):
+    database_path = tmp_path / "chronicle.db"
+    migration_sql = MIGRATION_PATH.read_text(encoding="utf-8")
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.executescript(migration_sql)
+
+        append_event(
+            connection=connection,
+            revision=1,
+            event=MillRepaired(actor_id="player-a"),
+        )
+        append_event(
+            connection=connection,
+            revision=2,
+            event=MillRepaired(actor_id="player-b"),
+        )
+        connection.commit()
+
+        stored_event = load_event(
+            connection=connection,
+            revision=2,
+        )
+
+    assert stored_event == StoredEvent(
+        revision=2,
+        event=MillRepaired(actor_id="player-b"),
+    )
+
+
+def test_load_event_returns_none_for_missing_revision(tmp_path: Path):
+    database_path = tmp_path / "chronicle.db"
+    migration_sql = MIGRATION_PATH.read_text(encoding="utf-8")
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.executescript(migration_sql)
+
+        stored_event = load_event(
+            connection=connection,
+            revision=999,
+        )
+
+    assert stored_event is None
