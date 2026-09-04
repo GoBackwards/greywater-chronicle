@@ -17,6 +17,11 @@ PROCESSED_COMMANDS_MIGRATION_PATH = (
     / "002_create_processed_commands.sql"
 )
 
+PLAYER_SESSIONS_MIGRATION_PATH = (
+    Path(__file__).parents[1]
+    / "migrations"
+    / "003_create_player_sessions.sql"
+)
 
 def _apply_initial_migration(connection: sqlite3.Connection) -> None:
     migration_sql = MIGRATION_PATH.read_text(encoding="utf-8")
@@ -33,6 +38,78 @@ def _apply_processed_commands_migration(
     connection.executescript(migration_sql)
     connection.commit()
 
+def _apply_player_sessions_migration(
+    connection: sqlite3.Connection,
+) -> None:
+    migration_sql = PLAYER_SESSIONS_MIGRATION_PATH.read_text(
+        encoding="utf-8"
+    )
+    connection.executescript(migration_sql)
+    connection.commit()
+
+def test_player_sessions_migration_creates_table(
+    tmp_path: Path,
+):
+    database_path = tmp_path / "chronicle.db"
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        # Migrations must be applied in historical order.
+        _apply_initial_migration(connection)
+        _apply_processed_commands_migration(connection)
+        _apply_player_sessions_migration(connection)
+
+        columns = connection.execute(
+            "PRAGMA table_info(player_sessions)"
+        ).fetchall()
+
+    assert [(column[1], column[2]) for column in columns] == [
+        ("session_token", "TEXT"),
+        ("player_id", "TEXT"),
+    ]
+
+    primary_key_positions = {
+        column[1]: column[5]
+        for column in columns
+    }
+
+    assert primary_key_positions["session_token"] == 1
+    assert all(column[3] == 1 for column in columns)
+
+def test_player_id_is_unique_across_sessions(
+    tmp_path: Path,
+):
+    database_path = tmp_path / "chronicle.db"
+
+    insert_session = """
+        INSERT INTO player_sessions (
+            session_token,
+            player_id
+        )
+        VALUES (?, ?)
+    """
+
+    with closing(sqlite3.connect(database_path)) as connection:
+        _apply_initial_migration(connection)
+        _apply_processed_commands_migration(connection)
+        _apply_player_sessions_migration(connection)
+
+        connection.execute(
+            insert_session,
+            ("token-a", "player-a"),
+        )
+        connection.commit()
+
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                insert_session,
+                ("token-b", "player-a"),
+            )
+
+        row_count = connection.execute(
+            "SELECT COUNT(*) FROM player_sessions"
+        ).fetchone()[0]
+
+    assert row_count == 1
 
 def test_processed_commands_migration_creates_table(tmp_path: Path):
     database_path = tmp_path / "chronicle.db"
