@@ -32,7 +32,7 @@ type PendingRepairCommand = {
 };
 
 export class GreywaterScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Sprite;
+  private player!: Phaser.Physics.Arcade.Sprite;
   private wasd!: {
     W: Phaser.Input.Keyboard.Key;
     A: Phaser.Input.Keyboard.Key;
@@ -81,26 +81,84 @@ export class GreywaterScene extends Phaser.Scene {
     if (!townTileset || !dungeonTileset) throw new Error('Tileset not found in tilemap');
     const tilesets = [townTileset, dungeonTileset];
 
-    map.layers.forEach(l =>
-      map.createLayer(l.name, tilesets, 0, 0)?.setScale(TILE_SCALE)
+    const groundLayer = map.createLayer(
+      'Ground',
+      tilesets,
+      0,
+      0,
     );
 
-    // 8. Label + player on top of the map (depth 10 ensures they render above tiles)
+    const structuresLayer = map.createLayer(
+      'StructuresBelowActors',
+      tilesets,
+      0,
+      0,
+    );
+
+    const foregroundLayer = map.createLayer(
+      'ForegroundAboveActors',
+      tilesets,
+      0,
+      0,
+    );
+
+    if (
+      !groundLayer ||
+      !structuresLayer ||
+      !foregroundLayer
+    ) {
+      throw new Error('Required tilemap layer is missing');
+    }
+
+    groundLayer
+      .setScale(TILE_SCALE)
+      .setDepth(0);
+
+    structuresLayer
+      .setScale(TILE_SCALE)
+      .setDepth(10);
+
+    foregroundLayer
+      .setScale(TILE_SCALE)
+      .setDepth(30);
+
+    // Actors render between lower structures (depth 10) and foreground tiles (depth 30).
     this.cameras.main.setBackgroundColor('#2d2d3a');
     this.add.text(480, 4, 'Greywater Township', { color: '#ffffff', fontSize: '20px' })
       .setOrigin(0.5, 0)
       .setDepth(10);
 
-    this.player = this.add.sprite(320, 280, 'tiny-dungeon', 85)   // ← swap 96 for your chosen index
+    this.player = this.physics.add.sprite(
+      320,
+      280,
+      'tiny-dungeon',
+      85,
+    )
       .setScale(TILE_SCALE)
-      .setDepth(10);
+      .setDepth(20)
+      .setBodySize(10, 6, false)
+      .setOffset(3, 10)
+      .setCollideWorldBounds(true);
 
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as typeof this.wasd;
     this.eKey = this.input.keyboard!.addKey('E');
 
     const worldW = map.widthInPixels * TILE_SCALE;
     const worldH = map.heightInPixels * TILE_SCALE;
-    this.cameras.main.setBounds(0, 0, worldW, worldH);
+    this.physics.world.setBounds(
+      0,
+      0,
+      worldW,
+      worldH,
+    );
+    this.createCollisionBodies(map);
+    this.cameras.main.setBounds(
+      0,
+      0,
+      worldW,
+      worldH,
+    );
+
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
     NPCs.forEach(npc => {
@@ -108,11 +166,11 @@ export class GreywaterScene extends Phaser.Scene {
       const worldY = npc.y * 16 * TILE_SCALE;
       const sprite = this.add.sprite(worldX, worldY, 'tiny-dungeon', npc.tile)
         .setScale(TILE_SCALE)
-        .setDepth(10)
+        .setDepth(20)
         .setInteractive({ useHandCursor: true });
       this.add.text(worldX, worldY - 20, npc.name, {
         color: '#fff', fontSize: '12px', backgroundColor: '#0006', padding: { x: 2 }
-      }).setOrigin(0.5, 1).setDepth(11);
+      }).setOrigin(0.5, 1).setDepth(21);
       sprite.on('pointerdown', () => this.openDialogue(npc));
       this.npcSprites.push({ sprite, data: npc });
     });
@@ -167,6 +225,80 @@ export class GreywaterScene extends Phaser.Scene {
 
     void this.loadWorldState();
     void this.initializePlayerSession();
+  }
+
+  private createCollisionBodies(
+    map: Phaser.Tilemaps.Tilemap,
+  ): void {
+    const collisionLayer = map.getObjectLayer('Collision');
+
+    if (!collisionLayer || collisionLayer.objects.length === 0) {
+      throw new Error(
+        'Collision object layer is missing or empty',
+      );
+    }
+
+    const collisionBodies = this.physics.add.staticGroup();
+
+    for (const object of collisionLayer.objects) {
+      const { x, y, width, height } = object;
+      if (object.rectangle !== true) {
+        throw new Error(
+          `Unsupported collision shape: ${
+            object.name || object.id
+          }`,
+        );
+      }
+
+      if (
+        typeof x !== 'number' ||
+        typeof y !== 'number' ||
+        typeof width !== 'number' ||
+        typeof height !== 'number' ||
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        throw new Error(
+          `Invalid collision rectangle: ${
+            object.name || object.id
+          }`,
+        );
+      }
+
+      if ((object.rotation ?? 0) !== 0) {
+        throw new Error(
+          `Rotated collision rectangle is unsupported: ${
+            object.name || object.id
+          }`,
+        );
+      }
+
+      const scaledWidth = width * TILE_SCALE;
+      const scaledHeight = height * TILE_SCALE;
+
+      const centerX =
+        x * TILE_SCALE + scaledWidth / 2;
+      const centerY =
+        y * TILE_SCALE + scaledHeight / 2;
+
+      const collisionZone = this.add.zone(
+        centerX,
+        centerY,
+        scaledWidth,
+        scaledHeight,
+      );
+
+      collisionBodies.add(collisionZone);
+    }
+
+    this.physics.add.collider(
+      this.player,
+      collisionBodies,
+    );
   }
 
   private async loadWorldState(): Promise<void> {
@@ -364,14 +496,28 @@ export class GreywaterScene extends Phaser.Scene {
       }
     }
 
-    // Movement is gated: no walking while reading
+    // Always stop the previous frame's velocity first.
+    this.player.setVelocity(0, 0);
+
+    // Movement is gated: no walking while reading.
     if (this.dialogueUI) return;
 
-    const speed = 3;
-    if (this.wasd.A.isDown) this.player.x -= speed;
-    if (this.wasd.D.isDown) this.player.x += speed;
-    if (this.wasd.W.isDown) this.player.y -= speed;
-    if (this.wasd.S.isDown) this.player.y += speed;
+    const speed = 180;
+    let velocityX = 0;
+    let velocityY = 0;
+
+    if (this.wasd.A.isDown) velocityX -= speed;
+    if (this.wasd.D.isDown) velocityX += speed;
+    if (this.wasd.W.isDown) velocityY -= speed;
+    if (this.wasd.S.isDown) velocityY += speed;
+
+    if (velocityX !== 0 && velocityY !== 0) {
+      const diagonalScale = 1 / Math.sqrt(2);
+      velocityX *= diagonalScale;
+      velocityY *= diagonalScale;
+    }
+
+    this.player.setVelocity(velocityX, velocityY);
   }
 
   private findNearestNPC(): NPC | null {
