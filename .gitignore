@@ -314,3 +314,7 @@ pyrightconfig.json
 
 # Tiled per-user state
 *.tiled-session
+
+# Local world database and SQLite sidecar files
+/backend/chronicle.db
+/backend/chronicle.db-*
