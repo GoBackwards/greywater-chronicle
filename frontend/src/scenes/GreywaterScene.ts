@@ -55,6 +55,8 @@ export class GreywaterScene extends Phaser.Scene {
   private repairControlText!: Phaser.GameObjects.Text;
   private repairInFlight = false;
   private pendingRepairCommand: PendingRepairCommand | null = null;
+  private millWheel!: Phaser.GameObjects.Image;
+  private millStateText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('greywater');
@@ -152,6 +154,7 @@ export class GreywaterScene extends Phaser.Scene {
       worldH,
     );
     this.createCollisionBodies(map);
+    this.createMillVisual(map);
     this.cameras.main.setBounds(
       0,
       0,
@@ -301,6 +304,91 @@ export class GreywaterScene extends Phaser.Scene {
     );
   }
 
+  private createMillVisual(
+    map: Phaser.Tilemaps.Tilemap,
+  ): void {
+    const mill = map
+      .getObjectLayer('Collision')
+      ?.objects.find(object => object.name === 'mill');
+
+    if (
+      !mill ||
+      mill.rectangle !== true ||
+      typeof mill.x !== 'number' ||
+      typeof mill.y !== 'number' ||
+      typeof mill.width !== 'number' ||
+      typeof mill.height !== 'number' ||
+      !Number.isFinite(mill.x) ||
+      !Number.isFinite(mill.y) ||
+      !Number.isFinite(mill.width) ||
+      !Number.isFinite(mill.height) ||
+      mill.width <= 0 ||
+      mill.height <= 0
+    ) {
+      throw new Error('Mill map object is missing or invalid');
+    }
+
+    const wheelX =
+      (mill.x + mill.width - 8) * TILE_SCALE;
+    const wheelY =
+      (mill.y + mill.height / 2) * TILE_SCALE;
+
+    this.millWheel = this.add.image(
+      wheelX,
+      wheelY,
+      'tiny-dungeon',
+      19,
+    )
+      .setScale(TILE_SCALE)
+      .setDepth(11)
+      .setVisible(false);
+
+    this.millStateText = this.add.text(
+      wheelX,
+      wheelY + 20,
+      '',
+      {
+        color: '#ffffff',
+        fontSize: '12px',
+        backgroundColor: '#000000aa',
+        padding: { x: 3, y: 2 },
+      },
+    )
+      .setOrigin(0.5, 0)
+      .setDepth(12)
+      .setVisible(false);
+  }
+
+  private updateMillVisual(): void {
+    const status = this.worldSnapshot?.mill_status;
+    const hasCanonicalState = status !== undefined;
+
+    this.millWheel.setVisible(hasCanonicalState);
+    this.millStateText.setVisible(hasCanonicalState);
+
+    if (status === undefined) return;
+
+    if (status === 'broken') {
+      this.millWheel
+        .setTint(0x75615b)
+        .setAngle(-20);
+
+      this.millStateText
+        .setText('MILL: BROKEN')
+        .setColor('#ef8b8b');
+
+      return;
+    }
+
+    this.millWheel
+      .clearTint()
+      .setAngle(0);
+
+    this.millStateText
+      .setText('MILL: WORKING')
+      .setColor('#8ee68e');
+  }
+
   private async loadWorldState(): Promise<void> {
     try {
       const response = await fetch(`${BACKEND_URL}/world`);
@@ -341,6 +429,7 @@ export class GreywaterScene extends Phaser.Scene {
       this.worldStatusText.setText('World: unavailable');
       console.error('Could not load world state', error);
     } finally {
+      this.updateMillVisual();
       this.updateRepairControl();
     }
   }
